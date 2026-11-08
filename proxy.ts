@@ -6,7 +6,7 @@ import { type NextRequest, NextResponse } from "next/server";
  * Supabase sessions fresh. This is a convenience check only - every page and server
  * action verifies the user again (lib/auth) and the database enforces access (RLS).
  */
-const PUBLIC_PREFIXES = ["/login", "/apply", "/unsubscribe", "/privacy", "/auth", "/api/health", "/api/cron", "/forbidden"];
+const PUBLIC_PREFIXES = ["/login", "/apply", "/unsubscribe", "/privacy", "/auth", "/api/health", "/api/cron", "/api/unsubscribe", "/forbidden"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

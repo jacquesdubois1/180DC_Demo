@@ -80,7 +80,12 @@ export function NewCycleDialog({ cycles }: { cycles: { id: string; name: string 
   );
 }
 
-export function TemplateEditor({ t }: { t: { id: string; name: string; subject: string; body: string; requires_review: boolean; is_active: boolean; trigger_stage: string | null; variant: string } }) {
+const HR_PLACEHOLDERS = ["first_name", "position", "cycle", "sender_name", "scheduling_link"];
+
+export function TemplateEditor({ t, placeholders = HR_PLACEHOLDERS }: {
+  t: { id: string; name: string; subject: string; body: string; requires_review: boolean; is_active: boolean; trigger_stage: string | null; variant: string };
+  placeholders?: string[];
+}) {
   const [subject, setSubject] = useState(t.subject);
   const [body, setBody] = useState(t.body);
   const [review, setReview] = useState(t.requires_review);
@@ -98,7 +103,8 @@ export function TemplateEditor({ t }: { t: { id: string; name: string; subject: 
       <div className="flex flex-wrap items-center gap-3 text-[13px]">
         <label className="flex items-center gap-1.5"><input type="checkbox" checked={review} onChange={(e) => setReview(e.target.checked)} />Needs approval before sending</label>
         <label className="flex items-center gap-1.5"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Active</label>
-        <span className="text-ink-3" title={Object.entries(PLACEHOLDERS).map(([k, v]) => `{{${k}}}: ${v}`).join("\n")}>Placeholders: {"{{first_name}}"}, {"{{position}}"}, … (hover)</span>
+        <span className="text-ink-3" title={placeholders.map((k) => `{{${k}}}: ${PLACEHOLDERS[k] ?? ""}`).join("\n")}>
+          Placeholders: {placeholders.slice(0, 3).map((k) => `{{${k}}}`).join(", ")}, … (hover)</span>
         <Button size="sm" className="ml-auto" disabled={pending} onClick={() => run(() => updateTemplate(t.id, { subject, body, requiresReview: review, isActive: active }))}>Save</Button>
       </div>
     </div>

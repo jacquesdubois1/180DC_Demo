@@ -82,7 +82,8 @@ export async function updatePosition(id: string, patch: { places?: number | null
 }
 
 export async function updateTemplate(id: string, patch: { subject: string; body: string; requiresReview: boolean; isActive: boolean }): Promise<ActionResult> {
-  const user = await requireRole("hr");
+  // shared by HR and Client Relations; row-level security limits each team to its own templates
+  const user = await requireRole("hr", "client_relations");
   const p = z.object({ subject: z.string().min(3).max(200), body: z.string().min(10).max(10000), requiresReview: z.boolean(), isActive: z.boolean() }).safeParse(patch);
   if (!p.success) return { ok: false, error: "Subject and body are required" };
   try {

@@ -39,9 +39,16 @@ export async function queueEmail(tx: Tx, e: QueueInput): Promise<{ id: string } 
   return { id: row.id };
 }
 
+/** Link for the e-mail body: opens a confirmation page (link scanners cannot unsubscribe anyone by prefetching). */
 export async function unsubscribeUrl(email: string) {
   const token = await signLinkToken({ email: email.toLowerCase(), purpose: "unsubscribe" });
   return `${env().APP_URL}/unsubscribe/${token}`;
+}
+
+/** RFC 8058 one-click endpoint for the List-Unsubscribe header (mail clients POST to it). */
+export async function oneClickUnsubscribeUrl(email: string) {
+  const token = await signLinkToken({ email: email.toLowerCase(), purpose: "unsubscribe" });
+  return `${env().APP_URL}/api/unsubscribe/${token}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +128,7 @@ export async function processOutbox(limit = 25): Promise<{ sent: number; failed:
       continue;
     }
     try {
-      const listUnsubscribe = m.department === "client_relations" ? await unsubscribeUrl(m.to_email) : undefined;
+      const listUnsubscribe = m.department === "client_relations" ? await oneClickUnsubscribeUrl(m.to_email) : undefined;
       const from = m.sender_name ? `${m.sender_name} via 180DC Hub <${e.EMAIL_FROM.match(/<(.+)>/)?.[1] ?? e.EMAIL_FROM}>` : e.EMAIL_FROM;
       const res = await sendViaProvider({ to: m.to_email, from, replyTo: m.sender_email, subject: m.subject, text: m.body_text, listUnsubscribe });
       await withService(async (sql) => {

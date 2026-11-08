@@ -31,6 +31,8 @@ function client() {
       types: {
         // return numerics as JS numbers (scores, probabilities); fine for our value ranges
         numeric: { to: 1700, from: [1700], serialize: (x: number) => String(x), parse: (x: string) => Number(x) },
+        // calendar dates stay "YYYY-MM-DD" strings (no timezone shifts when rendered)
+        date: { to: 1082, from: [1082], serialize: (x: string) => x, parse: (x: string) => x },
       },
     });
   }
@@ -64,5 +66,7 @@ export function dbErrorMessage(err: unknown): string {
   if (e?.code === "23505") return "This already exists (duplicate).";
   if (e?.code === "22023" || e?.code === "P0002") return e.message ?? "Invalid request.";
   if (e?.code === "23514") return "The data does not satisfy a validation rule.";
+  // unexpected: log the details server-side (Vercel function logs), show a generic message
+  console.error("[db]", e?.code ?? "", e?.message ?? err);
   return "Something went wrong. Please try again.";
 }

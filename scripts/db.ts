@@ -88,6 +88,14 @@ async function seed(sql: postgres.Sql) {
   const t0 = Date.now();
   await sql.begin((tx) => tx.unsafe(body));
   console.log(`✓ seed loaded (${Date.now() - t0} ms)`);
+  // derived data: lead scores (same code the app runs nightly)
+  const { recomputeScores } = await import("../lib/outreach/score-job");
+  const r = await sql.begin(async (tx) => {
+    await tx`select set_config('request.jwt.claims', '{"role":"service_role"}', true)`;
+    await tx.unsafe("set local role service_role");
+    return recomputeScores(tx as never);
+  });
+  console.log(`✓ ${r.scored} lead scores computed`);
 }
 
 main().catch((err) => {

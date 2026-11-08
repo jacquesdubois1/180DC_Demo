@@ -173,7 +173,7 @@ DECLARE
   v_lead public.leads;
   v_from public.lead_stage;
 BEGIN
-  IF NOT app.is_outreach() THEN
+  IF NOT (app.is_outreach() OR app.is_service()) THEN
     RAISE EXCEPTION 'Only Client Relations can change a lead' USING ERRCODE = '42501';
   END IF;
   SELECT * INTO v_lead FROM public.leads WHERE id = p_lead_id FOR UPDATE;
@@ -317,3 +317,30 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
                  JOIN public.people p ON p.id = pr.person_id
                  WHERE p.email = p_email::extensions.citext AND o.do_not_contact)
 $$;
+
+-- Aggregated (non-personal) recruitment output for Client Relations' capacity planning:
+-- how many consulting teams the current cycle will staff (5 consultants per team).
+CREATE OR REPLACE FUNCTION app.team_capacity()
+RETURNS TABLE (cycle_name text, accepted_consultants integer, offers_open integer, teams integer)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT c.name,
+         count(*) FILTER (WHERE a.stage = 'offer_accepted')::int,
+         count(*) FILTER (WHERE a.stage = 'offer_sent')::int,
+         ceil(count(*) FILTER (WHERE a.stage = 'offer_accepted') / 5.0)::int
+  FROM public.recruitment_cycles c
+  LEFT JOIN public.applications a ON a.cycle_id = c.id
+  LEFT JOIN public.positions p ON p.id = a.position_id AND p.slug IN ('impact-consultants', 'associates')
+  WHERE c.status IN ('open', 'closed') AND app.is_member() AND (a.id IS NULL OR p.id IS NOT NULL)
+  GROUP BY c.id, c.name, c.opens_at
+  ORDER BY c.opens_at DESC NULLS LAST
+  LIMIT 1
+$$;
+
+-- Latest applied migration, for /api/health and the admin system page.
+CREATE OR REPLACE FUNCTION app.schema_version() RETURNS text
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  RETURN (SELECT max(version) FROM supabase_migrations.schema_migrations);
+EXCEPTION WHEN undefined_table OR insufficient_privilege OR invalid_schema_name THEN
+  RETURN NULL;
+END $$;

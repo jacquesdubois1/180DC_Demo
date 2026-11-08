@@ -12,6 +12,7 @@
  */
 import { writeFileSync } from "node:fs";
 import path from "node:path";
+import { fitScore, type IcpCriteria } from "../../lib/outreach/scoring";
 import { makeCvPdf } from "./pdf";
 import { Rng, slugify } from "./random";
 import { ago, ahead, bytea, dateAgo, dateAhead, insert, json, type V } from "./sql";
@@ -442,6 +443,16 @@ const NEXT_STEPS: Record<string, string[]> = {
   on_hold: ["Re-contact in January"],
 };
 
+const ICP: IcpCriteria = {
+  sectors: { "Circular economy": 1, "Renewable energy": 0.9, Education: 0.9, "Refugees & migration": 1, "Financial inclusion": 0.9,
+    "Food & agriculture": 0.8, "Health & wellbeing": 0.8, "Tech for good": 0.8, "Water & oceans": 0.8, "Social housing": 0.9,
+    "Fashion & textiles": 0.7, "Sustainable mobility": 0.7, "Elderly care": 0.8, "Culture & arts": 0.5 },
+  org_types: { startup: 0.9, social_enterprise: 1, ngo: 1, foundation: 0.8, company: 0.5, public_sector: 0.4, university: 0.3, other: 0.3 },
+  size_bands: { "1-10": 0.8, "11-50": 1, "51-200": 0.9, "201-1000": 0.6, "1000+": 0.4 },
+  cities: { Barcelona: 1, Girona: 0.8, Sabadell: 0.8, Terrassa: 0.8, Madrid: 0.6, Valencia: 0.6 },
+  weights: { sector: 0.35, org_type: 0.25, size: 0.15, location: 0.15, alumni: 0.1 },
+};
+
 const orgs: { id: string; name: string; type: string; sector: string; city: string; size: string; domain: string }[] = [];
 const usedNames = new Set<string>();
 for (let i = 0; i < 175; i++) {
@@ -463,12 +474,12 @@ for (let i = 0; i < 175; i++) {
     created_at: ago(rng.int(5, 300)), created_by: rng.pick([uid(9), uid(10)]) });
 }
 
-const STAGE_MIX = [["new", 32], ["contacted", 30], ["follow_up", 15], ["replied", 12], ["meeting", 8], ["proposal", 6], ["won", 8], ["lost", 6], ["not_interested", 5], ["on_hold", 3]] as const;
 const TEMPLATE_IDS: Record<string, string> = {};
-const LEADS: { id: string; stage: string; org: (typeof orgs)[number]; contact: string; email: string; owner: string }[] = [];
+const LEADS: { id: string; stage: string; org: (typeof orgs)[number]; contact: string; email: string; owner: string; variant: "A" | "B";
+  createdDays: number; row: Row }[] = [];
 orgs.forEach((o, i) => {
   const nContacts = o.type === "company" ? rng.int(1, 3) : rng.int(1, 2);
-  const contacts: { id: string; email: string; first: string }[] = [];
+  const contacts: { id: string; email: string; first: string; alumni: boolean }[] = [];
   for (let k = 0; k < nContacts; k++) {
     const first = rng.pick(FIRST);
     const last = rng.pick(LAST);
@@ -479,17 +490,29 @@ orgs.forEach((o, i) => {
     add("public.people", { id: pid, first_name: first, last_name: last, email,
       linkedin_url: `https://www.linkedin.com/in/${slugify(first)}-${slugify(last)}-${rng.int(100, 999)}`, city: o.city, created_at: ago(200),
       do_not_contact: i === 11 && k === 0, created_by: uid(9) });
+    const alumni = rng.chance(0.2);
     add("public.person_roles", { person_id: pid, role: "contact", organization_id: o.id, title: rng.pick(TITLES[o.type]),
-      is_esade_alumni: rng.chance(0.2), start_date: dateAgo(300), created_by: uid(9) });
-    contacts.push({ id: pid, email, first });
+      is_esade_alumni: alumni, start_date: dateAgo(300), created_by: uid(9) });
+    contacts.push({ id: pid, email, first, alumni });
   }
   if (i >= 150 || !contacts.length) return; // some organisations have no lead yet
-  const stage = rng.weighted(STAGE_MIX);
+  // Outcome model with a built-in truth the analytics should recover:
+  //  - variant B of the first e-mail gets more replies than A (A/B test)
+  //  - better ICP fit -> more replies and more signed projects (lead scoring)
+  const fit = fitScore({ sector: o.sector, orgType: o.type, sizeBand: o.size, city: o.city, alumniContact: contacts[0].alumni }, ICP).score;
+  const fitFactor = Math.exp(0.35 * (fit - 75) / 10); // 0.5 at fit 55, 1.0 at 75, 1.7 at 90
+  const contactedLead = rng.chance(0.78);
+  const variantPick = rng.chance(0.5) ? "A" : "B";
+  const repliedLead = contactedLead && rng.chance(Math.min(0.9, (variantPick === "B" ? 0.36 : 0.22) * fitFactor));
+  const stage = !contactedLead ? "new"
+    : !repliedLead ? rng.weighted([["contacted", 62], ["follow_up", 38]] as const)
+    : rng.weighted([["replied", 20], ["meeting", 18], ["proposal", 12], ["won", Math.round(22 * fitFactor)], ["lost", Math.round(12 / fitFactor)],
+        ["not_interested", Math.round(10 / fitFactor)], ["on_hold", 6]] as const);
   const leadId = rng.uuid();
   const createdDays = rng.int(3, 120);
   const owner = rng.weighted([[uid(9), 55], [uid(10), 45]] as const);
-  const due = NEXT_STEPS[stage] ? rng.int(-12, 14) : null;
-  add("public.leads", { id: leadId, organization_id: o.id, owner_id: owner, stage, priority: rng.weighted([[1, 25], [2, 55], [3, 20]] as const),
+  const due = NEXT_STEPS[stage] ? rng.int(-5, 21) : null;
+  const leadRow: Row = { id: leadId, organization_id: o.id, owner_id: owner, stage, priority: rng.weighted([[1, 25], [2, 55], [3, 20]] as const),
     source: rng.weighted([["import", 40], ["manual", 20], ["ai_research", 12], ["alumni", 14], ["referral", 10], ["inbound", 4]] as const),
     project_idea: rng.chance(0.7) ? rng.pick(PROJECTS) : null,
     next_step: NEXT_STEPS[stage] ? rng.pick(NEXT_STEPS[stage]) : null,
@@ -497,9 +520,10 @@ orgs.forEach((o, i) => {
     lost_reason: stage === "lost" ? rng.pick(["Chose a paid consultancy", "No capacity this semester", "Project scope too small"])
       : stage === "not_interested" ? rng.pick(["Not interested", "Already working with another student club"]) : null,
     handed_over_to: stage === "won" ? rng.pick(["Marc Puig", "Clara Dubois"]) : null,
-    stage_changed_at: ago(Math.min(createdDays, rng.int(1, 40))), created_at: ago(createdDays), created_by: owner });
+    stage_changed_at: ago(createdDays), created_at: ago(createdDays), created_by: owner };
+  add("public.leads", leadRow);
   add("public.lead_contacts", { lead_id: leadId, person_id: contacts[0].id, is_primary: true });
-  LEADS.push({ id: leadId, stage, org: o, contact: contacts[0].id, email: contacts[0].email, owner });
+  LEADS.push({ id: leadId, stage, org: o, contact: contacts[0].id, email: contacts[0].email, owner, variant: variantPick, createdDays, row: leadRow });
 });
 
 // templates
@@ -544,8 +568,10 @@ const STAGES_AFTER_CONTACT = new Set(["contacted", "follow_up", "replied", "meet
 const REPLIED = new Set(["replied", "meeting", "proposal", "won", "lost", "not_interested", "on_hold"]);
 for (const l of LEADS) {
   if (!STAGES_AFTER_CONTACT.has(l.stage)) continue;
-  const variant = rng.chance(0.5) ? "A" : "B";
-  const sentDays = rng.int(8, 90);
+  const variant = l.variant;
+  // contact happens after the lead was created; every later step happens after the previous one
+  const sentDays = Math.max(2, Math.min(l.createdDays - 0.5, rng.int(8, 90)));
+  const history: [string, number][] = [["contacted", sentDays]];
   const outboxId = rng.uuid();
   add("public.email_outbox", { id: outboxId, department: "client_relations", template_id: TEMPLATE_IDS[`first_touch_${variant}`], template_variant: variant,
     to_email: l.email, to_person_id: l.contact, from_user_id: l.owner, subject: `180DC Barcelona x ${l.org.name}`,
@@ -555,21 +581,44 @@ for (const l of LEADS) {
     subject: `180DC Barcelona x ${l.org.name}`, summary: `First-touch e-mail (variant ${variant})`, email_outbox_id: outboxId,
     template_id: TEMPLATE_IDS[`first_touch_${variant}`], template_variant: variant, created_by: l.owner });
   // more replies for variant B: this is the "true" effect the A/B analysis should detect
-  const replied = REPLIED.has(l.stage) || (l.stage === "follow_up" && rng.chance(variant === "B" ? 0.08 : 0.03));
+  const replied = REPLIED.has(l.stage);
   if (replied) {
     const replyDays = Math.max(1, sentDays - rng.int(1, 6));
+    history.push(["replied", replyDays]);
     add("public.interactions", { organization_id: l.org.id, lead_id: l.id, person_id: l.contact, type: "email_in", occurred_at: ago(replyDays),
       subject: `Re: 180DC Barcelona x ${l.org.name}`, summary: rng.pick(["Interested, asks for a call.", "Wants to know more about timing.",
         "Forwarded to the right person.", "Not now, maybe next year."]), created_by: l.owner });
-    if (["meeting", "proposal", "won", "lost"].includes(l.stage)) {
+    let t = replyDays;
+    const hadMeeting = ["meeting", "proposal", "won"].includes(l.stage) || (l.stage === "lost" && rng.chance(0.7));
+    if (hadMeeting) {
+      t = Math.max(0.5, t - rng.int(1, 5));
+      history.push(["meeting", t]);
       add("public.interactions", { organization_id: l.org.id, lead_id: l.id, person_id: l.contact, type: rng.chance(0.7) ? "meeting" : "call",
-        occurred_at: ago(Math.max(0.5, replyDays - rng.int(1, 5))), subject: "Discovery call", summary: "Discussed goals, data availability and timeline.",
-        created_by: l.owner });
+        occurred_at: ago(t), subject: "Discovery call", summary: "Discussed goals, data availability and timeline.", created_by: l.owner });
+    }
+    if (["proposal", "won"].includes(l.stage) || (l.stage === "lost" && hadMeeting && rng.chance(0.5))) {
+      t = Math.max(0.4, t - rng.int(2, 8));
+      history.push(["proposal", t]);
+      add("public.interactions", { organization_id: l.org.id, lead_id: l.id, person_id: l.contact, type: "email_out", occurred_at: ago(t),
+        subject: `Project scope - ${l.org.name} x 180DC`, summary: "Sent the one-page project scope.", created_by: l.owner });
+    }
+    if (["won", "lost", "not_interested", "on_hold"].includes(l.stage)) {
+      t = Math.max(0.3, t - rng.int(1, 10));
+      history.push([l.stage, t]);
     }
   } else if (l.stage === "follow_up") {
-    add("public.interactions", { organization_id: l.org.id, lead_id: l.id, person_id: l.contact, type: "email_out", occurred_at: ago(Math.max(1, sentDays - 5)),
+    const fuDays = Math.max(1, sentDays - 5);
+    history.push(["follow_up", fuDays]);
+    add("public.interactions", { organization_id: l.org.id, lead_id: l.id, person_id: l.contact, type: "email_out", occurred_at: ago(fuDays),
       subject: `Re: ${l.org.name} x 180DC Barcelona`, summary: "Follow-up 1", template_id: TEMPLATE_IDS.followup_1_A, template_variant: "A", created_by: l.owner });
   }
+  let prev = "new";
+  for (const [to, days] of history) {
+    add("public.status_history", { entity: "lead", entity_id: l.id, from_status: prev, to_status: to, changed_at: ago(days), changed_by: l.owner,
+      note: to === "lost" || to === "not_interested" ? (l.row.lost_reason as string) : null });
+    prev = to;
+  }
+  l.row.stage_changed_at = ago(history[history.length - 1][1]);
   if (l.stage === "contacted") {
     add("public.sequence_enrollments", { sequence_id: SEQUENCE_ID, lead_id: l.id, person_id: l.contact, step_index: 0,
       next_run_at: rng.chance(0.5) ? ahead(rng.int(1, 5)) : ago(rng.int(0, 2)), status: "active", enrolled_by: l.owner });
@@ -584,15 +633,7 @@ for (let k = 0; k < 40; k++) {
     sent_at: ago(rng.int(10, 120)), campaign: "Spring outreach (archived)", created_at: ago(120), scheduled_for: ago(120), created_by: uid(9) });
 }
 
-add("public.icp_profiles", { name: "Impact organisations in Catalonia", is_active: true, created_by: uid(9), criteria: json({
-  sectors: { "Circular economy": 1, "Renewable energy": 0.9, Education: 0.9, "Refugees & migration": 1, "Financial inclusion": 0.9,
-    "Food & agriculture": 0.8, "Health & wellbeing": 0.8, "Tech for good": 0.8, "Water & oceans": 0.8, "Social housing": 0.9,
-    "Fashion & textiles": 0.7, "Sustainable mobility": 0.7, "Elderly care": 0.8, "Culture & arts": 0.5 },
-  org_types: { startup: 0.9, social_enterprise: 1, ngo: 1, foundation: 0.8, company: 0.5, public_sector: 0.4, university: 0.3, other: 0.3 },
-  size_bands: { "1-10": 0.8, "11-50": 1, "51-200": 0.9, "201-1000": 0.6, "1000+": 0.4 },
-  cities: { Barcelona: 1, Girona: 0.8, Sabadell: 0.8, Terrassa: 0.8, Madrid: 0.6, Valencia: 0.6 },
-  weights: { sector: 0.35, org_type: 0.25, size: 0.15, location: 0.15, alumni: 0.1 },
-}) });
+add("public.icp_profiles", { name: "Impact organisations in Catalonia", is_active: true, created_by: uid(9), criteria: json(ICP) });
 
 for (const e of ["no-thanks@" + orgs[3].domain, "privacy@" + orgs[19].domain]) {
   add("public.email_suppressions", { email: e, reason: "unsubscribe", source: "unsubscribe link", created_at: ago(rng.int(5, 40)) });
@@ -615,6 +656,7 @@ for (const [name, sector, city, why] of [
 
 add("public.settings", { key: "organization", value: json({ name: "180 Degrees Consulting Barcelona", short_name: "180DC Barcelona" }),
   description: "Name used in e-mails and on the public form" });
+add("public.settings", { key: "outreach", value: json({ projects_per_term: 8 }), description: "Client projects we aim to sign per term" });
 add("public.settings", { key: "email", value: json({ daily_limit_per_sender: 80, min_seconds_between: 20, from_name: "180 Degrees Consulting Barcelona" }),
   description: "Sending limits protect deliverability of members' mailboxes" });
 
