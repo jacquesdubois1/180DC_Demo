@@ -26,6 +26,15 @@
   --violet: #5f4290;
   --violet-soft: #efeaf7;
   --ring: rgb(30 106 68 / 0.35);
+  /* chart palette - validated with the dataviz validator (CVD + contrast), light surface */
+  --series-1: #16804a;
+  --series-2: #2a78d6;
+  --series-3: #eb6834;
+  --div-neg: #e34948;
+  --div-pos: #2a78d6;
+  --div-mid: #d9dcd8;
+  --chart-grid: #edf0ec;
+  --chart-axis: #8a958d;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -51,6 +60,14 @@
     --violet: #a68ad6;
     --violet-soft: #2a2238;
     --ring: rgb(93 187 134 / 0.4);
+    --series-1: #3fa56f;
+    --series-2: #3987e5;
+    --series-3: #d95926;
+    --div-neg: #e66767;
+    --div-pos: #3987e5;
+    --div-mid: #3a4740;
+    --chart-grid: #26322a;
+    --chart-axis: #7d8a81;
     color-scheme: dark;
   }
 }
@@ -77,6 +94,14 @@
   --violet: #a68ad6;
   --violet-soft: #2a2238;
   --ring: rgb(93 187 134 / 0.4);
+  --series-1: #3fa56f;
+  --series-2: #3987e5;
+  --series-3: #d95926;
+  --div-neg: #e66767;
+  --div-pos: #3987e5;
+  --div-mid: #3a4740;
+  --chart-grid: #26322a;
+  --chart-axis: #7d8a81;
   color-scheme: dark;
 }
 

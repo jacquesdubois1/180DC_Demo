@@ -380,10 +380,11 @@ for (const c of CYCLES) {
     if (c.key === "current" && personId && stage === "interview") {
       const when = rng.chance(0.4) ? -rng.float() * 3 : rng.float() * 9;
       const panel = rng.sample(REVIEWERS, 2).map((r) => r.id);
-      add("public.interviews", { application_id: appId, round: 1, scheduled_at: when < 0 ? ago(-when) : ahead(when),
+      const slot = `date_trunc('day', now()) + interval '${Math.round(when)} days' + interval '${rng.pick([10, 11, 12, 15, 16, 17])} hours'`;
+      add("public.interviews", { application_id: appId, round: 1, scheduled_at: { raw: slot },
         duration_minutes: 45, format: rng.chance(0.6) ? "in_person" : "online",
         location: rng.chance(0.6) ? "Esade Pedralbes, room 2.13" : "Google Meet", interviewer_ids: raw2uuidArray(panel),
-        status: when < 0 ? "done" : "scheduled", created_by: uid(3) });
+        status: Math.round(when) < 0 ? "done" : "scheduled", created_by: uid(3) });
     }
     if (c.key === "current" && personId && rng.chance(0.12)) {
       add("public.application_comments", { application_id: appId, author_id: rng.pick([uid(2), uid(3)]),

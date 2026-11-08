@@ -4,15 +4,15 @@ import { cn } from "@/lib/utils";
 const field =
   "w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:opacity-60";
 
-export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...props }: React.ComponentProps<"input">) {
   return <input className={cn(field, "h-9", className)} {...props} />;
 }
 
-export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return <textarea className={cn(field, "min-h-24 py-2 leading-relaxed", className)} {...props} />;
 }
 
-export function Select({ className, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({ className, children, ...props }: React.ComponentProps<"select">) {
   return (
     <select className={cn(field, "h-9 appearance-none bg-[length:16px] bg-[right_8px_center] bg-no-repeat pr-8", className)}
       style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23717d75' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")" }}

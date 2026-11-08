@@ -28,7 +28,7 @@ const schema = z.object({
 
   AI_MODE: z.enum(["off", "mock", "live"]).default("mock"),
   ANTHROPIC_API_KEY: z.string().optional(),
-  AI_MODEL: z.string().default("claude-sonnet-5-5"),
+  AI_MODEL: z.string().default("claude-opus-5-5"),
 
   CRON_SECRET: z.string().optional(),
 });

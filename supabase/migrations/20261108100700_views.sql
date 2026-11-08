@@ -10,11 +10,13 @@ SELECT a.id, a.cycle_id, c.name AS cycle_name, a.position_id, p.name AS position
        a.university, a.degree_program, a.study_year, a.languages, a.heard_from,
        a.cv_file_id, a.extracted IS NOT NULL AS has_extraction,
        a.submitted_at, a.stage_changed_at, a.decided_at, a.decision_reason, a.anonymized_at,
+       (current_date - a.stage_changed_at::date) AS days_in_stage,
        (SELECT count(*)::int FROM public.application_reviewers ar WHERE ar.application_id = a.id
           AND ar.stage = CASE WHEN a.stage IN ('received', 'screening') THEN 'screening'::public.review_stage
                               ELSE 'interview'::public.review_stage END) AS reviewers_assigned,
-       (SELECT count(*)::int FROM public.reviews r WHERE r.application_id = a.id AND r.submitted_at IS NOT NULL)
-         AS reviews_submitted,
+       (SELECT count(*)::int FROM public.reviews r WHERE r.application_id = a.id AND r.submitted_at IS NOT NULL
+          AND r.stage = CASE WHEN a.stage IN ('received', 'screening') THEN 'screening'::public.review_stage
+                             ELSE 'interview'::public.review_stage END) AS reviews_submitted,
        (SELECT round(avg(v.value::numeric), 2) FROM public.reviews r, jsonb_each_text(r.scores) v
           WHERE r.application_id = a.id AND r.submitted_at IS NOT NULL) AS avg_score,
        (SELECT count(*)::int FROM public.reviews r WHERE r.application_id = a.id AND r.submitted_at IS NOT NULL
