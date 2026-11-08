@@ -1,0 +1,30 @@
+name: Migrate production database
+
+# Applies new files in supabase/migrations to the production database after they reach main.
+# Needs the repository secret DATABASE_URL_DIRECT (Supabase "direct connection" string, port 5432).
+# Without it the job does nothing. Protect the "production" environment in the repository settings
+# to require an approval before migrations run.
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/migrations/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Apply pending migrations
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
+        run: |
+          if [ -z "$DATABASE_URL_DIRECT" ]; then echo "DATABASE_URL_DIRECT is not set - skipping"; exit 0; fi
+          npm run db:migrate

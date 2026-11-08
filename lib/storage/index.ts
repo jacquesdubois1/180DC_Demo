@@ -46,7 +46,7 @@ export async function storeFile(input: {
       .upload(input.path, input.bytes, { contentType: input.contentType, upsert: false });
     if (error) throw new Error(`Upload failed: ${error.message}`);
   } else if (backend === "disk") {
-    const full = path.join(process.cwd(), env().STORAGE_DISK_PATH, input.bucket, input.path);
+    const full = path.join(/*turbopackIgnore: true*/ process.cwd(), env().STORAGE_DISK_PATH, input.bucket, input.path);
     await mkdir(path.dirname(full), { recursive: true });
     await writeFile(full, input.bytes);
   }
@@ -73,7 +73,7 @@ export async function readFileContent(fileId: string): Promise<{ bytes: Buffer; 
     return blob ? { bytes: Buffer.from(blob.content), filename: f.filename, contentType: f.content_type } : null;
   }
   if (f.storage_backend === "disk") {
-    const bytes = await readFile(path.join(process.cwd(), env().STORAGE_DISK_PATH, f.bucket, f.path));
+    const bytes = await readFile(path.join(/*turbopackIgnore: true*/ process.cwd(), env().STORAGE_DISK_PATH, f.bucket, f.path));
     return { bytes, filename: f.filename, contentType: f.content_type };
   }
   const { data, error } = await supabaseAdmin().storage.from(f.bucket).download(f.path);
@@ -84,7 +84,7 @@ export async function readFileContent(fileId: string): Promise<{ bytes: Buffer; 
 /** Removes stored content; the `files` row is deleted by the caller (or cascades). */
 export async function deleteFileContent(file: { bucket: string; path: string; storage_backend: string }) {
   if (file.storage_backend === "disk") {
-    await rm(path.join(process.cwd(), env().STORAGE_DISK_PATH, file.bucket, file.path), { force: true });
+    await rm(path.join(/*turbopackIgnore: true*/ process.cwd(), env().STORAGE_DISK_PATH, file.bucket, file.path), { force: true });
   } else if (file.storage_backend === "supabase") {
     await supabaseAdmin().storage.from(file.bucket).remove([file.path]);
   }

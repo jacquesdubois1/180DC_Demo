@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { BrandLockup } from "@/components/brand";
 import { ApplyForm } from "@/components/hr/apply-form";
+import { connection } from "next/server";
 import { withService } from "@/lib/db";
 import { env } from "@/lib/env";
 import { format } from "date-fns";
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ApplyPage() {
+  await connection(); // render per request: open positions and deadlines come from the database
   const data = await withService(async (sql) => {
     const [cycle] = await sql<{ id: string; name: string; closes_at: string | null; retention_days: number }[]>`
       select id, name, closes_at, retention_days from recruitment_cycles

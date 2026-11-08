@@ -13,7 +13,8 @@
     "db:seed": "tsx scripts/db.ts seed",
     "db:seed:generate": "tsx scripts/seed/generate.ts",
     "test": "vitest run",
-    "test:e2e": "playwright test --trace off"
+    "test:e2e": "playwright test --trace off",
+    "test:db": "vitest run --config vitest.db.config.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",

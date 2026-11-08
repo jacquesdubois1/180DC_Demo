@@ -1,0 +1,23 @@
+name: Outbox tick
+
+# Vercel's Hobby plan runs cron jobs at most once a day. Throttled campaigns and follow-ups need
+# a more frequent tick, so GitHub calls the protected endpoint every 15 minutes instead.
+# Set the repository variable HUB_URL (e.g. https://hub.example.org) and the secret CRON_SECRET
+# (same value as in Vercel). Until HUB_URL is set the job is skipped.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  tick:
+    if: ${{ vars.HUB_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send due e-mails and follow-ups
+        env:
+          HUB_URL: ${{ vars.HUB_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: curl -fsS --max-time 60 -H "Authorization: Bearer $CRON_SECRET" "$HUB_URL/api/cron/outbox"

@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # fictional demo configuration - no real secrets are needed to test the Hub
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+  AUTH_PROVIDER: demo
+  DEMO_MODE: "true"
+  AUTH_SECRET: ci-only-secret-not-used-anywhere-else-0123456789
+  APP_URL: http://localhost:3000
+  EMAIL_PROVIDER: log
+  STORAGE_BACKEND: database
+  AI_MODE: mock
+
+jobs:
+  checks:
+    name: Lint, types, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  database:
+    name: Migrations, seed, row-level security
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Apply migrations to an empty database and load the demo seed
+        run: npm run db:reset
+      - name: Migrations are idempotent
+        run: npm run db:migrate
+      - run: npm run test:db
+
+  e2e:
+    name: End-to-end (Playwright)
+    needs: [checks]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run db:reset
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npx playwright test --trace off
+        env: { CI: "true" }
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-results, path: test-results, retention-days: 7 }

@@ -77,7 +77,9 @@ export function matchOrganization(row: { name: string; domain: string | null }, 
       best = e;
     }
   }
-  if (best && bestSim >= 0.97) return { status: "duplicate" as MatchStatus, id: best.id, similarity: bestSim, reason: "same name" };
+  // only an identical normalised name is a sure duplicate: short names with a long common prefix
+  // ("Kidsnet" / "Kidsnest") score above 0.97 and must not be merged automatically
+  if (best && best.normalized === n) return { status: "duplicate" as MatchStatus, id: best.id, similarity: 1, reason: "same name" };
   if (best && bestSim >= 0.88) return { status: "possible_duplicate" as MatchStatus, id: best.id, similarity: bestSim, reason: `similar name (${Math.round(bestSim * 100)}%)` };
   return { status: "new" as MatchStatus, id: null, similarity: bestSim, reason: null };
 }
