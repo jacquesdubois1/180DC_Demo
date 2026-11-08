@@ -40,7 +40,11 @@ let cached: Env | null = null;
 export function env(): Env {
   if (cached) return cached;
   // empty strings (unset values in .env files) count as "not set"
-  const raw = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
+  const raw: Record<string, string | undefined> = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
+  // names set automatically by the Supabase integration in the Vercel Marketplace
+  raw.DATABASE_URL ??= raw.POSTGRES_URL;
+  raw.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= raw.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  raw.SUPABASE_SERVICE_ROLE_KEY ??= raw.SUPABASE_SECRET_KEY;
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
     throw new Error(`Invalid environment: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
@@ -50,10 +54,9 @@ export function env(): Env {
   if (process.env.VERCEL_ENV === "production" && e.AUTH_PROVIDER === "demo" && !e.DEMO_MODE) {
     throw new Error("AUTH_PROVIDER=demo is only allowed when DEMO_MODE=true (fake data).");
   }
-  if (process.env.NODE_ENV === "production" && e.AUTH_SECRET.startsWith("dev-only")) {
-    if (e.AUTH_PROVIDER === "demo" && process.env.VERCEL_ENV) {
-      throw new Error("Set AUTH_SECRET (32+ random characters) in the Vercel project settings.");
-    }
+  // AUTH_SECRET signs demo sessions AND the unsubscribe links in e-mails, so every deployment needs its own
+  if (process.env.VERCEL_ENV && e.AUTH_SECRET.startsWith("dev-only")) {
+    throw new Error("Set AUTH_SECRET (32+ random characters) in the Vercel project settings.");
   }
   cached = e;
   return e;

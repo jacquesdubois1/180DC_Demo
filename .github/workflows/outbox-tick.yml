@@ -20,4 +20,5 @@ jobs:
         env:
           HUB_URL: ${{ vars.HUB_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: curl -fsS --max-time 60 -H "Authorization: Bearer $CRON_SECRET" "$HUB_URL/api/cron/outbox"
+        run: |
+          curl -fsS --max-time 60 -H "Authorization: Bearer $CRON_SECRET" "$HUB_URL/api/cron/outbox"

@@ -18,7 +18,9 @@ const MIGRATIONS = path.join(ROOT, "supabase", "migrations");
 const SHIM = path.join(ROOT, "supabase", "local", "00_supabase_shim.sql");
 const SEED = path.join(ROOT, "supabase", "seed.sql");
 
-const url = process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
+// migrations need a direct / session-mode connection; the Vercel Supabase integration calls it POSTGRES_URL_NON_POOLING
+const url = [process.env.DATABASE_URL_DIRECT, process.env.POSTGRES_URL_NON_POOLING, process.env.DATABASE_URL, process.env.POSTGRES_URL]
+  .find((v) => v) ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
 
 function isLocal(u: string) {
   const host = new URL(u).hostname;
@@ -81,6 +83,13 @@ async function migrate(sql: postgres.Sql) {
     console.log(`✓ ${file} (${Date.now() - t0} ms)`);
   }
   console.log(count ? `✓ ${count} migration(s) applied` : "✓ database is up to date");
+  // the app switches to these roles per request (withUser / withService); without membership every query fails
+  const [roles] = await sql<{ authenticated: boolean; service: boolean }[]>`
+    SELECT pg_has_role(current_user, 'authenticated', 'MEMBER') AS authenticated, pg_has_role(current_user, 'service_role', 'MEMBER') AS service`;
+  if (!roles.authenticated || !roles.service) {
+    console.warn(`! ${String(await sql`select current_user`.then((r) => r[0].current_user))} cannot switch to the roles authenticated/service_role -`
+      + " connect as the database owner (postgres) or GRANT authenticated, service_role TO <user>.");
+  }
 }
 
 async function seed(sql: postgres.Sql) {

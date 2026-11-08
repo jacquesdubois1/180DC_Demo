@@ -32,7 +32,11 @@ export default async function LoginPage(props: PageProps<"/login">) {
       <p className="mt-2 max-w-[60ch] text-ink-2">
         Recruitment and client outreach of 180 Degrees Consulting Barcelona in one place.
       </p>
-      {sp.error ? <p className="mt-4 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">Sign-in failed. Please try again.</p> : null}
+      {sp.error ? (
+        <p className="mt-4 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+          {sp.error === "domain" ? "Please sign in with your 180DC Google Workspace account." : "Sign-in failed. Please try again."}
+        </p>
+      ) : null}
 
       {e.AUTH_PROVIDER === "supabase" ? (
         <form action={signInWithGoogle} className="mt-8">
