@@ -109,7 +109,8 @@ for (const c of CYCLES) {
   const id = rng.uuid();
   cycleIds.set(c.key, id);
   add("public.recruitment_cycles", { id, name: c.name, slug: c.slug, status: c.status, opens_at: c.opens, closes_at: c.closes,
-    retention_days: c.retention, blind_screening: true, reviewers_per_application: 2, created_by: uid(2) });
+    retention_days: c.retention, blind_screening: true, reviewers_per_application: 2, privacy_notice_version: c.key === "current" ? "2026-11" : "2026-02",
+    created_by: uid(2) });
   TRACKS.forEach((t, i) => {
     const pid = rng.uuid();
     positionIds.set(`${c.key}:${t.slug}`, pid);

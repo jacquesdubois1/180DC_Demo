@@ -1413,10 +1413,10 @@ INSERT INTO public.rubric_criteria (rubric_id, key, label, description, anchors,
   ('0e37c7f4-ec60-44a0-8595-2b2efc86dae7', 'team_fit', 'Team fit', 'Collaborative, coachable, humble', '{"1":"Concerns","3":"Good","5":"Excellent"}'::jsonb, 1, 3),
   ('0e37c7f4-ec60-44a0-8595-2b2efc86dae7', 'drive', 'Drive & ownership', 'Takes initiative, follows through', '{"1":"Low","3":"Good","5":"Exceptional"}'::jsonb, 1, 4);
 
-INSERT INTO public.recruitment_cycles (id, name, slug, status, opens_at, closes_at, retention_days, blind_screening, reviewers_per_application, created_by) VALUES
-  ('e20f6543-c922-4d74-a559-803133775d06', 'Spring 2027', 'spring-2027', 'open', now() - interval '672 hours', now() + interval '336 hours', 180, TRUE, 2, '00000000-0000-4000-8000-000000000002'),
-  ('b1694a4e-10c9-49eb-bde5-0cfe7e050f9e', 'Autumn 2026', 'autumn-2026', 'closed', now() - interval '2640 hours', now() - interval '1920 hours', 180, TRUE, 2, '00000000-0000-4000-8000-000000000002'),
-  ('6d7fca29-fb72-4ffd-aa52-d7ef6e66d5e2', 'Spring 2026', 'spring-2026', 'archived', now() - interval '6960 hours', now() - interval '6120 hours', 180, TRUE, 2, '00000000-0000-4000-8000-000000000002');
+INSERT INTO public.recruitment_cycles (id, name, slug, status, opens_at, closes_at, retention_days, blind_screening, reviewers_per_application, privacy_notice_version, created_by) VALUES
+  ('e20f6543-c922-4d74-a559-803133775d06', 'Spring 2027', 'spring-2027', 'open', now() - interval '672 hours', now() + interval '336 hours', 180, TRUE, 2, '2026-11', '00000000-0000-4000-8000-000000000002'),
+  ('b1694a4e-10c9-49eb-bde5-0cfe7e050f9e', 'Autumn 2026', 'autumn-2026', 'closed', now() - interval '2640 hours', now() - interval '1920 hours', 180, TRUE, 2, '2026-02', '00000000-0000-4000-8000-000000000002'),
+  ('6d7fca29-fb72-4ffd-aa52-d7ef6e66d5e2', 'Spring 2026', 'spring-2026', 'archived', now() - interval '6960 hours', now() - interval '6120 hours', 180, TRUE, 2, '2026-02', '00000000-0000-4000-8000-000000000002');
 
 INSERT INTO public.positions (id, cycle_id, name, slug, department, description, places, is_open, questions, screening_rubric_id, interview_rubric_id, position) VALUES
   ('3256230e-36d8-4655-b227-7a06cc7d4d5c', 'e20f6543-c922-4d74-a559-803133775d06', 'Impact Consultants', 'impact-consultants', 'consulting', 'Work in teams of 5-6 on pro bono consulting projects for NGOs and social enterprises.', 20, TRUE, '[{"key":"motivation","label":"Why do you want to join 180 Degrees Consulting Barcelona?","type":"long_text","required":true,"max_words":250},{"key":"impact_experience","label":"Describe an experience where you created social or environmental impact.","type":"long_text","required":true,"max_words":250},{"key":"teamwork","label":"Tell us about a time you worked in a diverse team. What did you learn?","type":"long_text","required":true,"max_words":200}]'::jsonb, '17ad2f46-76ef-4138-9153-eb6867aa6e99', '0e37c7f4-ec60-44a0-8595-2b2efc86dae7', 0),
