@@ -13,8 +13,9 @@ import { requireRole } from "@/lib/auth";
 import { withUser } from "@/lib/db";
 import { getLeads } from "@/lib/outreach/queries";
 import { reachedStages } from "@/lib/outreach/scoring";
-import { FUNNEL, LEAD_META } from "@/lib/outreach/stages";
+import { FUNNEL, LEAD_META, termStart } from "@/lib/outreach/stages";
 import { pct } from "@/lib/utils";
+import { format } from "date-fns";
 
 export const metadata: Metadata = { title: "Outreach overview" };
 
@@ -46,7 +47,8 @@ export default async function OutreachOverview() {
   extra.history.forEach((h) => hist.set(h.entity_id, [...(hist.get(h.entity_id) ?? []), h.to_status]));
   const reached = (stage: string) => leads.filter((l) => reachedStages(l.stage, hist.get(l.id) ?? []).includes(stage)).length;
   const open = leads.filter((l) => !LEAD_META[l.stage].closed);
-  const won = leads.filter((l) => l.stage === "won").length;
+  const since = termStart();
+  const won = leads.filter((l) => l.stage === "won" && new Date(l.stage_changed_at) >= since).length;
   const forecast = open.reduce((s, l) => s + (l.win_probability ?? 0), 0);
   const stale = open.filter((l) => l.days_since_activity > 14 && l.stage !== "new").sort((a, b) => b.days_since_activity - a.days_since_activity).slice(0, 6);
   const ab = analyzeAb(extra.perf.map((p) => ({ variant: p.variant, sent: p.sent, replied: p.replied })));
@@ -67,8 +69,8 @@ export default async function OutreachOverview() {
         <Stat label="Open leads" value={open.length} sub={`${leads.filter((l) => l.is_overdue).length} with an overdue next step`} tone={leads.some((l) => l.is_overdue) ? "warn" : "default"} />
         <Stat label="E-mails sent (30 days)" value={extra.sent30?.n ?? 0} sub={`${extra.sent30?.replies ?? 0} replies received`} />
         <Stat label="Reply rate (all time)" value={pct(reached("replied") / Math.max(reached("contacted"), 1))} sub="replied ÷ contacted" />
-        <Stat label="Signed projects" value={won} sub={`target ${extra.target} per term`} tone="brand" />
-        <Stat label="Forecast (expected)" value={`+${forecast.toFixed(1)}`} sub="sum of win probabilities of open leads" tone="brand" />
+        <Stat label="Signed this term" value={won} sub={`since ${format(since, "d MMM")} · target ${extra.target}`} tone="brand" />
+        <Stat label="Expected from pipeline" value={`+${forecast.toFixed(1)}`} sub="sum of win probabilities of open leads" tone="brand" />
       </div>
 
       <Card className="mt-5">
@@ -137,7 +139,7 @@ export default async function OutreachOverview() {
           <CardHeader><div><CardTitle>Where good leads come from</CardTitle><CardDescription>Leads and signed projects by source</CardDescription></div></CardHeader>
           <CardContent>
             <BarList rows={bySource.map(([source, s]) => ({ label: source.replace("_", " "), value: s.n, sub: `${s.won} signed` }))} />
-            <p className="mt-3 flex items-center gap-1.5 text-[12.5px] text-ink-3"><GraduationCap className="size-3.5" />Esade-alumni contacts raise the fit score (Mo&apos;s strategy).</p>
+            <p className="mt-3 flex items-center gap-1.5 text-[12.5px] text-ink-3"><GraduationCap className="size-3.5" />Esade-alumni contacts raise the fit score (alumni-first strategy).</p>
           </CardContent>
         </Card>
         <Card>

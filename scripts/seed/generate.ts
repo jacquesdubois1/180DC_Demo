@@ -586,8 +586,9 @@ for (const l of LEADS) {
     const replyDays = Math.max(1, sentDays - rng.int(1, 6));
     history.push(["replied", replyDays]);
     add("public.interactions", { organization_id: l.org.id, lead_id: l.id, person_id: l.contact, type: "email_in", occurred_at: ago(replyDays),
-      subject: `Re: 180DC Barcelona x ${l.org.name}`, summary: rng.pick(["Interested, asks for a call.", "Wants to know more about timing.",
-        "Forwarded to the right person.", "Not now, maybe next year."]), created_by: l.owner });
+      subject: `Re: 180DC Barcelona x ${l.org.name}`, summary: l.stage === "not_interested" ? rng.pick(["Not now, maybe next year.", "No capacity for a project this term."])
+        : rng.pick(["Interested, asks for a call.", "Wants to know more about timing.", "Forwarded to the right person.", "Sounds great - when could you start?"]),
+      created_by: l.owner });
     let t = replyDays;
     const hadMeeting = ["meeting", "proposal", "won"].includes(l.stage) || (l.stage === "lost" && rng.chance(0.7));
     if (hadMeeting) {

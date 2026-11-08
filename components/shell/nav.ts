@@ -39,6 +39,7 @@ export const NAV: NavSection[] = [
       { href: "/outreach/import", label: "Import prospects", icon: "upload" },
       { href: "/outreach/research", label: "AI lead research", icon: "sparkles" },
       { href: "/outreach/templates", label: "Templates & A/B tests", icon: "flask" },
+      { href: "/outreach/scoring", label: "Scoring model", icon: "gauge" },
     ],
   },
   {

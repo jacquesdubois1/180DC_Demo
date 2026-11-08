@@ -5,9 +5,10 @@ import { fitBand, fitScore, type IcpCriteria, learnRates, reachedStages, winProb
  * Recompute fit score, reply probability and win probability for every lead.
  * Runs inside the caller's transaction (RLS as a Client Relations user, or service role from cron).
  */
-export async function recomputeScores(sql: Tx) {
-  const [icp] = await sql<{ criteria: IcpCriteria }[]>`select criteria from icp_profiles where is_active order by created_at desc limit 1`;
-  if (!icp) return { scored: 0 };
+/** Fit the model on current data without writing anything (used by the scoring page and the job). */
+export async function computeModel(sql: Tx, criteria?: IcpCriteria) {
+  const [icp] = criteria ? [{ criteria }] : await sql<{ criteria: IcpCriteria }[]>`select criteria from icp_profiles where is_active order by created_at desc limit 1`;
+  if (!icp) return null;
   const leads = await sql<{ id: string; stage: string; sector: string | null; organization_type: string | null; size_band: string | null;
     city: string | null; primary_contact_is_alumni: boolean; replied: boolean; contacted: boolean; history: string[]; days_since_activity: number; age_days: number }[]>`
     select l.id, l.stage::text, l.sector, l.organization_type::text, l.size_band, l.city, l.primary_contact_is_alumni, l.days_since_activity,
@@ -47,6 +48,13 @@ export async function recomputeScores(sql: Tx) {
     replyByBand[b] = (pool.filter((l) => l.replied).length + 10 * overallReply) / (pool.length + 10);
   }
 
+  return { scored, rates, replyByBand, overallReply, cohortSize: cohort.length, matureDays: MATURE_DAYS };
+}
+
+export async function recomputeScores(sql: Tx) {
+  const model = await computeModel(sql);
+  if (!model) return { scored: 0 };
+  const { scored, rates, replyByBand, overallReply } = model;
   for (const l of scored) {
     const win = winProbability(l.stage, l.band, rates);
     await sql`

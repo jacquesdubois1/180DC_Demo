@@ -26,3 +26,15 @@ export const FUNNEL: { stage: LeadStage; label: string }[] = [
   { stage: "proposal", label: "Scope sent" },
   { stage: "won", label: "Signed" },
 ];
+
+/**
+ * Outreach terms: projects for the spring term are acquired Sep-Jan, for the autumn term Feb-Aug.
+ * Used to compare "signed this term" with the number of consulting teams recruitment will staff.
+ */
+export function termStart(now = new Date()): Date {
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0 = January
+  if (m >= 8) return new Date(Date.UTC(y, 8, 1));
+  if (m === 0) return new Date(Date.UTC(y - 1, 8, 1));
+  return new Date(Date.UTC(y, 1, 1));
+}

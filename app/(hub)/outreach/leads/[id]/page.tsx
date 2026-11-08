@@ -29,6 +29,11 @@ export default async function LeadPage(props: PageProps<"/outreach/leads/[id]">)
   if (!d) notFound();
   const { lead, contacts, interactions, emails, history, enrollments, otherLeads } = d;
   const comp = lead.components as Record<string, number> | null;
+  // one chronological feed: e-mails, calls and notes interleaved with stage changes
+  const timeline = [
+    ...interactions.map((item) => ({ kind: "interaction" as const, at: new Date(item.occurred_at).getTime(), key: item.id, item })),
+    ...history.map((item, k) => ({ kind: "stage" as const, at: new Date(item.changed_at).getTime(), key: String(k), item })),
+  ].sort((a, b) => b.at - a.at);
 
   return (
     <>
@@ -72,7 +77,17 @@ export default async function LeadPage(props: PageProps<"/outreach/leads/[id]">)
             <CardContent className="space-y-4">
               <InteractionForm leadId={lead.id} contacts={contacts.map((c) => ({ person_id: c.person_id, name: c.name }))} />
               <ol className="relative space-y-3 border-l border-line pl-5 text-[13.5px]">
-                {interactions.map((i) => {
+                {timeline.map((e) => {
+                  if (e.kind === "stage") {
+                    const h = e.item;
+                    return (
+                      <li key={`h${e.key}`} className="text-[12.5px] text-ink-3">
+                        <span className="absolute -left-[5px] mt-1.5 size-2.5 rounded-full bg-brand" />
+                        Stage → {LEAD_META[h.to_status as keyof typeof LEAD_META]?.label ?? h.to_status} · {format(new Date(h.changed_at), "d MMM, HH:mm")}{h.by ? ` · ${h.by}` : ""}{h.note ? ` · ${h.note}` : ""}
+                      </li>
+                    );
+                  }
+                  const i = e.item;
                   const Icon = ICON[i.type] ?? StickyNote;
                   return (
                     <li key={i.id}>
@@ -84,13 +99,7 @@ export default async function LeadPage(props: PageProps<"/outreach/leads/[id]">)
                     </li>
                   );
                 })}
-                {history.map((h, k) => (
-                  <li key={`h${k}`} className="text-[12.5px] text-ink-3">
-                    <span className="absolute -left-[5px] mt-1.5 size-2.5 rounded-full bg-brand" />
-                    Stage → {LEAD_META[h.to_status as keyof typeof LEAD_META]?.label ?? h.to_status} · {format(new Date(h.changed_at), "d MMM, HH:mm")}{h.by ? ` · ${h.by}` : ""}{h.note ? ` · ${h.note}` : ""}
-                  </li>
-                ))}
-                {!interactions.length && !history.length ? <li className="text-ink-3">No activity yet.</li> : null}
+                {!timeline.length ? <li className="text-ink-3">No activity yet.</li> : null}
               </ol>
             </CardContent>
           </Card>

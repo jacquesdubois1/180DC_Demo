@@ -9,7 +9,7 @@ import { processOutbox, queueEmail, unsubscribeUrl } from "@/lib/email/outbox";
 import { renderTemplate } from "@/lib/email/render";
 import type { ActionResult } from "@/lib/hr/actions";
 import { thompsonAllocate } from "./abtest";
-import { recomputeScores } from "./score-job";
+import { computeModel, recomputeScores } from "./score-job";
 import { LEAD_STAGES, type LeadStage } from "./stages";
 
 const uuid = z.string().uuid();
@@ -367,6 +367,65 @@ export async function updateSequence(input: z.infer<typeof sequenceSchema>): Pro
     await withUser(user.id, (tx) => tx`update email_sequences set steps = ${tx.json(p.data.steps)} where id = ${p.data.id} and department = 'client_relations'`);
     revalidate();
     return { ok: true, message: "Follow-up schedule saved" };
+  } catch (err) {
+    return { ok: false, error: dbErrorMessage(err) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ideal client profile (ICP): the "fit" half of the lead score
+// ---------------------------------------------------------------------------
+const unit = z.number().min(0).max(1);
+const icpSchema = z.object({
+  sectors: z.record(z.string().min(1).max(60), unit),
+  org_types: z.record(z.string().min(1).max(40), unit),
+  size_bands: z.record(z.string().min(1).max(20), unit),
+  cities: z.record(z.string().min(1).max(60), unit),
+  weights: z.object({ sector: unit, org_type: unit, size: unit, location: unit, alumni: unit }),
+});
+export type IcpInput = z.infer<typeof icpSchema>;
+
+async function bandSummary(tx: Tx, criteria?: IcpInput) {
+  const model = await computeModel(tx, criteria);
+  if (!model) return null;
+  const bands = ["A", "B", "C", "D"].map((b) => {
+    const pool = model.scored.filter((l) => l.band === b);
+    const contacted = pool.filter((l) => l.contacted);
+    return { band: b, leads: pool.length, contacted: contacted.length, replied: contacted.filter((l) => l.replied).length,
+      won: pool.filter((l) => l.stage === "won").length, lift: model.rates.band[b] };
+  });
+  return { bands, overallWin: model.rates.overall, cohort: model.cohortSize };
+}
+
+/** What-if: how would leads fall into fit bands with these settings? Nothing is saved. */
+export async function previewIcp(criteria: IcpInput): Promise<ActionResult<NonNullable<Awaited<ReturnType<typeof bandSummary>>>>> {
+  const user = await requireRole("client_relations");
+  const p = icpSchema.safeParse(criteria);
+  if (!p.success) return { ok: false, error: "Every value must be between 0 and 100%" };
+  try {
+    const data = await withUser(user.id, (tx) => bandSummary(tx, p.data));
+    return data ? { ok: true, data } : { ok: false, error: "No leads to score" };
+  } catch (err) {
+    return { ok: false, error: dbErrorMessage(err) };
+  }
+}
+
+/** Save a new ICP version (the old one is kept for traceability) and re-score every lead. */
+export async function saveIcp(criteria: IcpInput, name: string): Promise<ActionResult> {
+  const user = await requireRole("client_relations");
+  const p = icpSchema.safeParse(criteria);
+  if (!p.success) return { ok: false, error: "Every value must be between 0 and 100%" };
+  const total = Object.values(p.data.weights).reduce((a, b) => a + b, 0);
+  if (total <= 0) return { ok: false, error: "At least one weight must be above 0" };
+  try {
+    await withUser(user.id, async (tx) => {
+      await tx`update icp_profiles set is_active = false where is_active`;
+      await tx`insert into icp_profiles (name, is_active, criteria) values (${name.slice(0, 120) || "Ideal client profile"}, true, ${tx.json(p.data as never)})`;
+      await tx`select app.log_event('outreach.icp_saved', 'icp_profile', null, ${tx.json({ weights: p.data.weights } as never)})`;
+      await recomputeScores(tx);
+    });
+    revalidate();
+    return { ok: true, message: "Profile saved - all leads re-scored" };
   } catch (err) {
     return { ok: false, error: dbErrorMessage(err) };
   }

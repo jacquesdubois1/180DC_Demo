@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Activity, Building2, Calendar, ClipboardCheck, FlaskConical, Home, Kanban, LayoutDashboard, Lock, LogOut, Menu,
+  Activity, Building2, Calendar, ClipboardCheck, FlaskConical, Gauge, Home, Kanban, LayoutDashboard, Lock, LogOut, Menu,
   Scale, ScrollText, Send, Settings, Shield, Shuffle, Sparkles, Upload, Users, X,
 } from "lucide-react";
 import Link from "next/link";
@@ -19,7 +19,7 @@ import type { NavSection } from "./nav";
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   home: Home, "layout-dashboard": LayoutDashboard, kanban: Kanban, users: Users, shuffle: Shuffle, scale: Scale,
   calendar: Calendar, settings: Settings, "clipboard-check": ClipboardCheck, building: Building2, send: Send, upload: Upload,
-  sparkles: Sparkles, flask: FlaskConical, shield: Shield, lock: Lock, scroll: ScrollText, activity: Activity,
+  sparkles: Sparkles, flask: FlaskConical, gauge: Gauge, shield: Shield, lock: Lock, scroll: ScrollText, activity: Activity,
 };
 
 export function Sidebar({ sections, user, badges }: {
