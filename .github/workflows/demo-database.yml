@@ -1,0 +1,33 @@
+name: Set up demo database
+
+# Click "Run workflow" in the Actions tab to create the tables in the DEMO Supabase project and load the
+# fictional demo data - no local setup needed. Safe to run again: migrations that already ran are skipped
+# and the demo data is only loaded into an empty database.
+# Needs the repository secret DEMO_DATABASE_URL: the value of POSTGRES_URL_NON_POOLING from the Vercel
+# project settings (or Supabase -> Connect -> Session pooler). Never point it at a database with real data.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type demo to confirm that this database holds fictional data only
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    if: ${{ inputs.confirm == 'demo' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Create tables and load the demo data
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DEMO_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL_DIRECT" ]; then echo "::error::Add the repository secret DEMO_DATABASE_URL first"; exit 1; fi
+          npm run db:migrate
+          npx tsx scripts/db.ts seed

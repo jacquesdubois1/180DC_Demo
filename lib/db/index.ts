@@ -1,6 +1,7 @@
 import "server-only";
 import postgres from "postgres";
 import { env } from "@/lib/env";
+import { cleanDatabaseUrl } from "./url";
 
 /**
  * Data access layer.
@@ -22,7 +23,7 @@ declare global {
 
 function client() {
   if (!globalThis.__hubSql) {
-    globalThis.__hubSql = postgres(env().DATABASE_URL, {
+    globalThis.__hubSql = postgres(cleanDatabaseUrl(env().DATABASE_URL), {
       max: process.env.VERCEL ? 3 : 10,
       idle_timeout: 20,
       connect_timeout: 10,

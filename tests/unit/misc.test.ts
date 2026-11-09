@@ -17,3 +17,12 @@ describe("outreach terms", () => {
     expect(termStart(new Date("2027-03-01")).toISOString().slice(0, 10)).toBe("2027-02-01");
   });
 });
+
+describe("database URLs from hosting integrations", () => {
+  it("drops parameters meant for other clients but keeps sslmode", async () => {
+    const { cleanDatabaseUrl } = await import("@/lib/db/url");
+    const url = cleanDatabaseUrl("postgres://postgres.abc:p%40ss@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x&pgbouncer=true");
+    expect(url).toBe("postgres://postgres.abc:p%40ss@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require");
+    expect(cleanDatabaseUrl("postgres://postgres:postgres@127.0.0.1:54322/postgres")).toBe("postgres://postgres:postgres@127.0.0.1:54322/postgres");
+  });
+});

@@ -24,16 +24,24 @@ pooler* string, port 6543, and `DATABASE_URL_DIRECT` to the *session/direct* str
 
 ### 2. Schema and demo data
 
-From your computer, with the session/direct connection string of the **demo** project (Supabase → *Connect*):
+**Without a local setup (browser only):**
+
+1. Vercel → Project → Settings → Environment Variables → copy the value of `POSTGRES_URL_NON_POOLING`.
+2. GitHub → repository → Settings → Secrets and variables → Actions → *New repository secret*:
+   name `DEMO_DATABASE_URL`, value = the copied connection string.
+3. GitHub → Actions → **Set up demo database** → *Run workflow*, type `demo`, run. It creates the tables and loads the
+   fictional demo data; running it again is harmless.
+
+**Or from your computer**, with the session/direct connection string of the **demo** project (Supabase → *Connect*):
 
 ```bash
 DATABASE_URL_DIRECT="postgresql://postgres.<ref>:<password>@aws-0-eu-central-1.pooler.supabase.com:5432/postgres" npm run db:migrate
 ```
 
-Load the fictional demo data (this **drops all tables** first - demo project only):
+Load the fictional demo data (only into an empty database):
 
 ```bash
-DATABASE_URL_DIRECT="<same demo connection string>" npx tsx scripts/db.ts reset --force
+DATABASE_URL_DIRECT="<same demo connection string>" npx tsx scripts/db.ts seed
 ```
 
 The migrate command warns if the database user cannot switch to the `authenticated` / `service_role` roles; with the
@@ -43,7 +51,7 @@ default `postgres` user on Supabase it can.
 
 | Variable | Demo value |
 | --- | --- |
-| `AUTH_SECRET` | 48 random characters, e.g. from `openssl rand -base64 48` |
+| `AUTH_SECRET` | 48 random characters, e.g. from `openssl rand -base64 48` - **required**, the build stops without it |
 | `APP_URL` | the deployment URL, e.g. `https://180dc-hub.vercel.app` |
 | `AUTH_PROVIDER` | `demo` |
 | `DEMO_MODE` | `true` |
@@ -52,9 +60,11 @@ default `postgres` user on Supabase it can.
 | `STORAGE_BACKEND` | `database` |
 | `AI_MODE` | `mock`, or `live` together with `ANTHROPIC_API_KEY` |
 
+Select all environments (Production, Preview, Development). Variables only apply to new deployments.
+
 ### 4. Deploy and check
 
-Push to `main` (or *Redeploy* in Vercel). Then open:
+Push to `main` or use *Deployments → ⋯ → Redeploy* in Vercel. Then open:
 
 - `https://<your-app>/api/health` → `{"ok":true,"db":"up",...}`
 - sign in as **Alex Romero (admin)** → *Admin → System*: every configuration line should be green

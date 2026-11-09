@@ -12,6 +12,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import postgres from "postgres";
+import { cleanDatabaseUrl } from "../lib/db/url";
 
 const ROOT = path.resolve(__dirname, "..");
 const MIGRATIONS = path.join(ROOT, "supabase", "migrations");
@@ -19,8 +20,8 @@ const SHIM = path.join(ROOT, "supabase", "local", "00_supabase_shim.sql");
 const SEED = path.join(ROOT, "supabase", "seed.sql");
 
 // migrations need a direct / session-mode connection; the Vercel Supabase integration calls it POSTGRES_URL_NON_POOLING
-const url = [process.env.DATABASE_URL_DIRECT, process.env.POSTGRES_URL_NON_POOLING, process.env.DATABASE_URL, process.env.POSTGRES_URL]
-  .find((v) => v) ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
+const url = cleanDatabaseUrl([process.env.DATABASE_URL_DIRECT, process.env.POSTGRES_URL_NON_POOLING, process.env.DATABASE_URL, process.env.POSTGRES_URL]
+  .find((v) => v) ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres");
 
 function isLocal(u: string) {
   const host = new URL(u).hostname;
@@ -93,6 +94,11 @@ async function migrate(sql: postgres.Sql) {
 }
 
 async function seed(sql: postgres.Sql) {
+  const [{ n }] = await sql`SELECT count(*)::int AS n FROM public.app_users`;
+  if (n > 0) {
+    console.log(`✓ database already contains ${n} user(s) - demo data not loaded again`);
+    return;
+  }
   const body = readFileSync(SEED, "utf8");
   const t0 = Date.now();
   await sql.begin((tx) => tx.unsafe(body));
